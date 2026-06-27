@@ -4,6 +4,13 @@
 
 A full-stack mini project demonstrating two independent systems with shared JWT authentication, deployed across Vercel (frontends) and Azure (backends + databases).
 
+## Live Sites
+
+| System | URL |
+|---|---|
+| **Operational System** | https://project-integration-kappa.vercel.app |
+| **Delivery System** | https://project-integration-ktup.vercel.app |
+
 ## Architecture
 
 ```
