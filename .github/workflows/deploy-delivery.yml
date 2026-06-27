@@ -46,23 +46,11 @@ jobs:
   deploy-frontend:
     runs-on: ubuntu-latest
     needs: build-and-deploy-backend
-    defaults:
-      run:
-        working-directory: ${{ env.FRONTEND_PATH }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Vercel build (local)
-        run: npx vercel@latest build --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DELIVERY }}
-
-      - name: Deploy to Vercel (prebuilt)
-        run: npx vercel@latest deploy --prebuilt --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
+      - name: Deploy to Vercel
+        run: npx vercel@latest --cwd ${{ env.FRONTEND_PATH }} --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DELIVERY }}
