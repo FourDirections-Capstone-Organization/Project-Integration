@@ -18,3 +18,13 @@ export interface UpdateProductDto {
   description?: string;
   price: number;
 }
+
+export interface DeliveryOrder {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  status: string;
+  customerName: string;
+  createdAt: string;
+}

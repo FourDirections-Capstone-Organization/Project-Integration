@@ -32,6 +32,22 @@ public class DeliverySystemClient : IDeliverySystemClient
         return JsonSerializer.Deserialize<Models.DTOs.DeliveryOrderResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 
+    public async Task<List<Models.DTOs.DeliveryOrderResponse>> GetAllOrdersAsync()
+    {
+        await EnsureTokenAsync();
+
+        var request = new HttpRequestMessage(HttpMethod.Get,
+            $"{_configuration["ExternalSystems:Delivery:BaseUrl"]}/api/integration/orders");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _tokenStore.Token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode) return new List<Models.DTOs.DeliveryOrderResponse>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<List<Models.DTOs.DeliveryOrderResponse>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+               ?? new List<Models.DTOs.DeliveryOrderResponse>();
+    }
+
     private async Task EnsureTokenAsync()
     {
         if (_tokenStore.IsValid) return;
