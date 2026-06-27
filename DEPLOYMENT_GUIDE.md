@@ -115,9 +115,20 @@ az postgres flexible-server show-connection-string --server shared-postgres-<suf
 az sql db show-connection-string --server delivery-sqlserver-<suffix> --name deliverydb --client ado.net
 ```
 
-Each command outputs a connection string. **Copy each one** — you will paste them into the `--secrets dbconn="..."` argument of the deploy commands in steps 2.7, 2.8, and 2.9 below.
+Each command outputs JSON. Find the `"ado.net"` value — that's the connection string. It will contain `{login}` and `{password}` placeholders. **Replace them** with your actual credentials:
 
-> 🔑 For the SQL Server string, replace `{your_password}` with `MyStr0ngP@ss!`.
+| Placeholder | Replace with |
+|---|---|
+| `{login}` | `postgres` (PostgreSQL) or `sqladmin` (SQL Server) |
+| `{password}` | `MyStr0ngP@ss!` |
+| `Trust Server Certificate` | Add `Trust Server Certificate=true` at the end if missing |
+
+**Example** — after replacing, a PostgreSQL connection string looks like:
+```
+Server=shared-postgres-ab12.postgres.database.azure.com;Database=authdb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
+```
+
+You will paste this **entire string** into the `--secrets dbconn="..."` argument of the deploy commands in steps 2.7, 2.8, and 2.9 below.
 
 ### 2.5 Create Azure Container Registry
 
