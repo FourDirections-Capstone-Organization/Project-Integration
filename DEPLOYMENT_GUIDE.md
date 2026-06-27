@@ -77,6 +77,8 @@ az provider register --namespace Microsoft.ContainerRegistry
 ### 2.2 Create PostgreSQL Server (Shared for Auth & Operational)
 
 > **Free tier:** 750 hours/month of Burstable B1MS for 12 months — running one server 24/7 uses ~730 hours, well within the free grant.
+>
+> ⚠️ Azure may show a *"Paid Tier"* warning for `Standard_B1ms`. This is normal — it's a paid SKU, but your **Azure Free Account** covers the first 750 hours/month at **no charge** for 12 months. You will not be billed within that limit.
 
 Create **one** PostgreSQL server, then create two databases inside it:
 
