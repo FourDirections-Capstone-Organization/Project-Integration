@@ -298,6 +298,7 @@ In your GitHub repo → **Settings** → **Secrets and variables** → **Actions
 | Secret Name | Value |
 |---|---|
 | `AZURE_CREDENTIALS` | `az ad sp create-for-rbac` output (see below) |
+| `AZURE_REGISTRY_NAME` | Your ACR name (e.g. `crudregistryab12` — no `.azurecr.io`) |
 | `AZURE_REGISTRY_USERNAME` | From `az acr credential show` |
 | `AZURE_REGISTRY_PASSWORD` | From `az acr credential show` |
 | `VERCEL_TOKEN` | From Vercel account tokens |

@@ -8,7 +8,8 @@ on:
       - '.github/workflows/deploy-delivery.yml'
 
 env:
-  AZURE_CONTAINER_REGISTRY: crudregistry2026.azurecr.io
+  AZURE_CONTAINER_REGISTRY: ${{ secrets.AZURE_REGISTRY_NAME || 'crudregistry2026' }}.azurecr.io
+  AZURE_REGISTRY_NAME: ${{ secrets.AZURE_REGISTRY_NAME || 'crudregistry2026' }}
   BACKEND_IMAGE_NAME: delivery-backend
   AZURE_CONTAINER_APP_NAME: delivery-backend
   AZURE_RESOURCE_GROUP: crud-app
@@ -26,7 +27,7 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Log in to Azure Container Registry
-        run: az acr login --name crudregistry2026
+        run: az acr login --name ${{ env.AZURE_REGISTRY_NAME }}
 
       - name: Build and push Delivery Docker image
         run: |
