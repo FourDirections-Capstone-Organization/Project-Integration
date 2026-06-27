@@ -100,32 +100,24 @@ az sql db create --resource-group crud-app --server delivery-sqlserver-<suffix> 
 az sql server firewall-rule create --resource-group crud-app --server delivery-sqlserver-<suffix> --name AllowAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
 ```
 
-### 2.4 Get Connection Strings
+### 2.4 Create Connection Strings (you'll paste these into the deploy commands below)
 
-**PostgreSQL (Auth & Operational share the same server, different databases):**
+Run these commands to generate each connection string:
+
 ```bash
+# --- For Auth Service (PostgreSQL) ---
 az postgres flexible-server show-connection-string --server shared-postgres-<suffix> --database authdb
-```
 
-Take the output and change `Database=postgres` to the correct value:
-- **Auth Service**: `Database=authdb`
-- **Operational System**: `Database=operationaldb`
+# --- For Operational System (PostgreSQL) ---
+az postgres flexible-server show-connection-string --server shared-postgres-<suffix> --database operationaldb
 
-> ⚠️ The strings below are **reference only** — copy the values, do NOT paste them into PowerShell as commands.
-
-Example connection strings (replace `<suffix>` with yours):
-
-```
-Auth Service:   Server=shared-postgres-<suffix>.postgres.database.azure.com;Database=authdb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
-Operational:    Server=shared-postgres-<suffix>.postgres.database.azure.com;Database=operationaldb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
-```
-
-**SQL Server (Delivery):**
-```bash
+# --- For Delivery System (SQL Server) ---
 az sql db show-connection-string --server delivery-sqlserver-<suffix> --name deliverydb --client ado.net
 ```
 
-> Replace `{your_password}` in each with `MyStr0ngP@ss!`.
+Each command outputs a connection string. **Copy each one** — you will paste them into the `--secrets dbconn="..."` argument of the deploy commands in steps 2.7, 2.8, and 2.9 below.
+
+> 🔑 For the SQL Server string, replace `{your_password}` with `MyStr0ngP@ss!`.
 
 ### 2.5 Create Azure Container Registry
 
@@ -148,20 +140,26 @@ az containerapp env create --name crud-env --resource-group crud-app --location 
 
 ### 2.7 Deploy Auth Service Backend
 
+> Paste the **Auth Service PostgreSQL connection string** (from step 2.4) inside the quotes after `dbconn=`
+
 ```bash
-az containerapp create --name auth-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 0 --max-replicas 10 --secrets dbconn="<auth-postgres-connection-string>" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems Jwt__AccessTokenExpirationMinutes=60
+az containerapp create --name auth-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 0 --max-replicas 10 --secrets dbconn="paste-auth-connection-string-here" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems Jwt__AccessTokenExpirationMinutes=60
 ```
 
 ### 2.8 Deploy Operational System Backend
 
+> Paste the **Operational System PostgreSQL connection string** (from step 2.4) inside the quotes after `dbconn=`
+
 ```bash
-az containerapp create --name operational-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 0 --max-replicas 10 --secrets dbconn="<operational-postgres-connection-string>" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Delivery__BaseUrl=https://delivery-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Delivery__ServiceAccountEmployeeNumber=SVC-OPERATIONAL ExternalSystems__Delivery__ServiceAccountPassword=svc-operational-pwd
+az containerapp create --name operational-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 0 --max-replicas 10 --secrets dbconn="paste-operational-connection-string-here" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Delivery__BaseUrl=https://delivery-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Delivery__ServiceAccountEmployeeNumber=SVC-OPERATIONAL ExternalSystems__Delivery__ServiceAccountPassword=svc-operational-pwd
 ```
 
 ### 2.9 Deploy Delivery System Backend
 
+> Paste the **Delivery System SQL Server connection string** (from step 2.4) inside the quotes after `dbconn=`
+
 ```bash
-az containerapp create --name delivery-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 0 --max-replicas 10 --secrets dbconn="Server=delivery-sqlserver-<suffix>.database.windows.net;Database=deliverydb;User Id=sqladmin;Password=MyStr0ngP@ss!;TrustServerCertificate=True" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__BaseUrl=https://operational-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__ServiceAccountEmployeeNumber=SVC-DELIVERY ExternalSystems__Operational__ServiceAccountPassword=svc-delivery-pwd
+az containerapp create --name delivery-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 0 --max-replicas 10 --secrets dbconn="paste-delivery-connection-string-here" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__BaseUrl=https://operational-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__ServiceAccountEmployeeNumber=SVC-DELIVERY ExternalSystems__Operational__ServiceAccountPassword=svc-delivery-pwd
 ```
 
 ### 2.10 Get Backend URLs
