@@ -58,11 +58,18 @@ git push -u origin main
 
 ## Phase 2: Set Up Azure Resources
 
-### 2.1 Login and Create Resource Group
+### 2.1 Login, Create Resource Group, and Register Providers
 
+Run these once:
 ```bash
 az login
 az group create --name crud-app --location southeastasia
+
+# Register required resource providers (needed for first-time Azure subscriptions)
+az provider register --namespace Microsoft.DBforPostgreSQL
+az provider register --namespace Microsoft.Sql
+az provider register --namespace Microsoft.App
+az provider register --namespace Microsoft.ContainerRegistry
 ```
 
 > **⚠️ Name uniqueness:** Azure server names (PostgreSQL, SQL Server, Container Registry) must be **globally unique**. Pick a **single suffix** (e.g., your initials + a number like `mj06`) and use it everywhere below. All commands use `<suffix>` as a placeholder — replace it with your chosen suffix.
