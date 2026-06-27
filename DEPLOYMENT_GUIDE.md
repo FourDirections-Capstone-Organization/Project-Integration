@@ -31,7 +31,7 @@
 |---|---|---|
 | GitHub | https://github.com | Store code, run CI/CD |
 | Vercel | https://vercel.com | Host frontend (free tier) |
-| Azure | https://azure.microsoft.com/free/students | Host backend + database |
+| Azure | https://azure.microsoft.com/free | Host backend + database |
 
 ### Tools to Install
 1. **Git** — https://git-scm.com
@@ -54,6 +54,8 @@ git push -u origin main
 
 ---
 
+> **💰 Cost Note:** All services below are covered under the [Azure Free Account](https://azure.microsoft.com/free) — either as 12-month free services or always-free services. No charges will occur within the free limits. See [Cost Summary](#cost-summary) at the end.
+
 ## Phase 2: Set Up Azure Resources
 
 ### 2.1 Login and Create Resource Group
@@ -63,19 +65,24 @@ az login
 az group create --name crud-app --location southeastasia
 ```
 
-### 2.2 Create PostgreSQL Databases (Auth & Operational)
+### 2.2 Create PostgreSQL Server (Shared for Auth & Operational)
 
-**Auth Service Database:**
-```bash
-az postgres flexible-server create --name auth-db --resource-group crud-app --location southeastasia --admin-user postgres --admin-password MyStr0ngP@ss! --sku-name Standard_B1ms --tier Burstable --storage-size 32 --public-access 0.0.0.0
-```
+> **Free tier:** 750 hours/month of Burstable B1MS for 12 months — running one server 24/7 uses ~730 hours, well within the free grant.
 
-**Operational System Database:**
+Create **one** PostgreSQL server, then create two databases inside it:
+
 ```bash
-az postgres flexible-server create --name operational-db --resource-group crud-app --location southeastasia --admin-user postgres --admin-password MyStr0ngP@ss! --sku-name Standard_B1ms --tier Burstable --storage-size 32 --public-access 0.0.0.0
+# Create the server
+az postgres flexible-server create --name shared-postgres --resource-group crud-app --location southeastasia --admin-user postgres --admin-password MyStr0ngP@ss! --sku-name Standard_B1ms --tier Burstable --storage-size 32 --public-access 0.0.0.0
+
+# Create separate databases for Auth Service and Operational System
+az postgres flexible-server db create --server-name shared-postgres --resource-group crud-app --name authdb
+az postgres flexible-server db create --server-name shared-postgres --resource-group crud-app --name operationaldb
 ```
 
 ### 2.3 Create SQL Server Database (Delivery)
+
+> **Free tier:** 100,000 vCore seconds/month of serverless Azure SQL Database with 32 GB storage — always free, no time limit.
 
 ```bash
 az sql server create --name delivery-sqlserver --resource-group crud-app --location southeastasia --admin-user sqladmin --admin-password MyStr0ngP@ss!
@@ -85,10 +92,23 @@ az sql server firewall-rule create --resource-group crud-app --server delivery-s
 
 ### 2.4 Get Connection Strings
 
-**PostgreSQL (Auth & Operational):**
+**PostgreSQL (Auth & Operational share the same server, different databases):**
 ```bash
-az postgres flexible-server show-connection-string --server auth-db --database postgres --resource-group crud-app --query "connectionStrings.ado.net"
-az postgres flexible-server show-connection-string --server operational-db --database postgres --resource-group crud-app --query "connectionStrings.ado.net"
+# Get the server connection string template
+az postgres flexible-server show-connection-string --server shared-postgres --database postgres --resource-group crud-app --query "connectionStrings.ado.net"
+```
+
+Take the output and create two connection strings by changing the `Database` value:
+- **Auth Service**: `Database=authdb`
+- **Operational System**: `Database=operationaldb`
+
+Example:
+```
+# Auth Service
+Server=shared-postgres.postgres.database.azure.com;Database=authdb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
+
+# Operational System
+Server=shared-postgres.postgres.database.azure.com;Database=operationaldb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
 ```
 
 **SQL Server (Delivery):**
@@ -100,14 +120,18 @@ az sql db show-connection-string --server delivery-sqlserver --name deliverydb -
 
 ### 2.5 Create Azure Container Registry
 
+> **Free tier:** 1 Standard tier registry with 100 GB storage for 12 months.
+
 ```bash
-az acr create --name crudregistry2026 --resource-group crud-app --location southeastasia --sku Basic --admin-enabled true
+az acr create --name crudregistry2026 --resource-group crud-app --location southeastasia --sku Standard --admin-enabled true
 az acr credential show --name crudregistry2026 --resource-group crud-app
 ```
 
 Save the **username** and **password** for GitHub secrets.
 
 ### 2.6 Create Container Apps Environment
+
+> **Free tier:** Consumption plan — 180,000 vCPU-seconds, 360,000 GiB-seconds, and 2 million requests per month, always free. With `--min-replicas 0`, apps scale to zero when idle and cost nothing.
 
 ```bash
 az containerapp env create --name crud-env --resource-group crud-app --location southeastasia
@@ -116,19 +140,19 @@ az containerapp env create --name crud-env --resource-group crud-app --location 
 ### 2.7 Deploy Auth Service Backend
 
 ```bash
-az containerapp create --name auth-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 1 --max-replicas 10 --secrets dbconn="<auth-postgres-connection-string>" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems Jwt__AccessTokenExpirationMinutes=60
+az containerapp create --name auth-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 0 --max-replicas 10 --secrets dbconn="<auth-postgres-connection-string>" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems Jwt__AccessTokenExpirationMinutes=60
 ```
 
 ### 2.8 Deploy Operational System Backend
 
 ```bash
-az containerapp create --name operational-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 1 --max-replicas 10 --secrets dbconn="<operational-postgres-connection-string>" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Delivery__BaseUrl=https://delivery-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Delivery__ServiceAccountEmployeeNumber=SVC-OPERATIONAL ExternalSystems__Delivery__ServiceAccountPassword=svc-operational-pwd
+az containerapp create --name operational-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 0 --max-replicas 10 --secrets dbconn="<operational-postgres-connection-string>" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Delivery__BaseUrl=https://delivery-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Delivery__ServiceAccountEmployeeNumber=SVC-OPERATIONAL ExternalSystems__Delivery__ServiceAccountPassword=svc-operational-pwd
 ```
 
 ### 2.9 Deploy Delivery System Backend
 
 ```bash
-az containerapp create --name delivery-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 1 --max-replicas 10 --secrets dbconn="Server=delivery-sqlserver.database.windows.net;Database=deliverydb;User Id=sqladmin;Password=MyStr0ngP@ss!;TrustServerCertificate=True" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__BaseUrl=https://operational-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__ServiceAccountEmployeeNumber=SVC-DELIVERY ExternalSystems__Operational__ServiceAccountPassword=svc-delivery-pwd
+az containerapp create --name delivery-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 0 --max-replicas 10 --secrets dbconn="Server=delivery-sqlserver.database.windows.net;Database=deliverydb;User Id=sqladmin;Password=MyStr0ngP@ss!;TrustServerCertificate=True" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__BaseUrl=https://operational-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__ServiceAccountEmployeeNumber=SVC-DELIVERY ExternalSystems__Operational__ServiceAccountPassword=svc-delivery-pwd
 ```
 
 ### 2.10 Get Backend URLs
@@ -371,6 +395,29 @@ Common causes:
 1. Go to repo → **Actions** → click the failed run
 2. Read the error message
 3. Common issues: secrets not set, Azure credentials expired, Docker build fails
+
+---
+
+## Cost Summary (Free Tier)
+
+All services used in this project are covered under the [Azure Free Account](https://azure.microsoft.com/free) free tiers:
+
+| Service | Tier Used | Free Tier Coverage | Monthly Cost |
+|---|---|---|---|
+| **Azure Database for PostgreSQL** (×1, shared) | Burstable B1MS, 32 GB | 750 hours/month for 12 months | **$0** (~730h used) |
+| **Azure SQL Database** | S0 serverless, 32 GB | 100,000 vCore seconds/month, always free | **$0** |
+| **Azure Container Registry** | Standard | 1 Standard registry for 12 months | **$0** |
+| **Azure Container Apps** (×3) | Consumption plan | 180K vCPU-sec + 360K GiB-sec + 2M requests/month, always free | **$0** (scale to zero) |
+| **Vercel** (×2) | Free (Hobby) | 100 GB bandwidth, unlimited sites | **$0** |
+| **GitHub Actions** | Free (public repo) | 2,000 minutes/month | **$0** |
+| **Docker Desktop** | Free | — | **$0** |
+| | | **Total** | **$0/month** |
+
+### Staying within free limits
+
+- **PostgreSQL:** One shared server (B1MS) running 24/7 uses ~730 hours/month, well within the 750-hour free grant.
+- **Container Apps:** `--min-replicas 0` scales to zero when idle — you only pay when traffic hits them (free grants cover thousands of requests).
+- **SQL Database:** Serverless auto-pauses after 60 minutes of inactivity, consuming 0 vCore seconds when paused.
 
 ---
 

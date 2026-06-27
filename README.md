@@ -1,5 +1,7 @@
 # Project Integration — Multi-System Architecture
 
+> **Demo project** for experimenting with cross-system deployment and integration. Not intended for production use. All Azure services use [free tier](https://azure.microsoft.com/free) — no charges within free limits.
+
 A full-stack mini project demonstrating two independent systems with shared JWT authentication, deployed across Vercel (frontends) and Azure (backends + databases).
 
 ## Architecture
