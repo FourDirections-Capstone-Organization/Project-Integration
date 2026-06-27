@@ -65,6 +65,8 @@ az login
 az group create --name crud-app --location southeastasia
 ```
 
+> **⚠️ Name uniqueness:** Azure server names (PostgreSQL, SQL Server, Container Registry) must be **globally unique**. If you get an error like "already used", add your initials or a random number suffix (e.g., `shared-postgres-ab12`, `delivery-sqlserver-ab12`). Use the **same suffix** for all names below.
+
 ### 2.2 Create PostgreSQL Server (Shared for Auth & Operational)
 
 > **Free tier:** 750 hours/month of Burstable B1MS for 12 months — running one server 24/7 uses ~730 hours, well within the free grant.
@@ -72,12 +74,15 @@ az group create --name crud-app --location southeastasia
 Create **one** PostgreSQL server, then create two databases inside it:
 
 ```bash
+# Choose a unique server name (replace "ab12" with your initials + random number)
+set UNIQUE=ab12
+
 # Create the server
-az postgres flexible-server create --name shared-postgres --resource-group crud-app --location southeastasia --admin-user postgres --admin-password MyStr0ngP@ss! --sku-name Standard_B1ms --tier Burstable --storage-size 32 --public-access 0.0.0.0
+az postgres flexible-server create --name shared-postgres-%UNIQUE% --resource-group crud-app --location southeastasia --admin-user postgres --admin-password MyStr0ngP@ss! --sku-name Standard_B1ms --tier Burstable --storage-size 32 --public-access 0.0.0.0
 
 # Create separate databases for Auth Service and Operational System
-az postgres flexible-server db create --server-name shared-postgres --resource-group crud-app --name authdb
-az postgres flexible-server db create --server-name shared-postgres --resource-group crud-app --name operationaldb
+az postgres flexible-server db create --server-name shared-postgres-%UNIQUE% --resource-group crud-app --name authdb
+az postgres flexible-server db create --server-name shared-postgres-%UNIQUE% --resource-group crud-app --name operationaldb
 ```
 
 ### 2.3 Create SQL Server Database (Delivery)
@@ -85,35 +90,38 @@ az postgres flexible-server db create --server-name shared-postgres --resource-g
 > **Free tier:** 100,000 vCore seconds/month of serverless Azure SQL Database with 32 GB storage — always free, no time limit.
 
 ```bash
-az sql server create --name delivery-sqlserver --resource-group crud-app --location southeastasia --admin-user sqladmin --admin-password MyStr0ngP@ss!
-az sql db create --resource-group crud-app --server delivery-sqlserver --name deliverydb --service-objective S0
-az sql server firewall-rule create --resource-group crud-app --server delivery-sqlserver --name AllowAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
+# Use the same unique suffix
+set UNIQUE=ab12
+
+az sql server create --name delivery-sqlserver-%UNIQUE% --resource-group crud-app --location southeastasia --admin-user sqladmin --admin-password MyStr0ngP@ss!
+az sql db create --resource-group crud-app --server delivery-sqlserver-%UNIQUE% --name deliverydb --service-objective S0
+az sql server firewall-rule create --resource-group crud-app --server delivery-sqlserver-%UNIQUE% --name AllowAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
 ```
 
 ### 2.4 Get Connection Strings
 
 **PostgreSQL (Auth & Operational share the same server, different databases):**
 ```bash
-# Get the server connection string template
-az postgres flexible-server show-connection-string --server shared-postgres --database postgres --resource-group crud-app --query "connectionStrings.ado.net"
+# Replace "ab12" with your unique suffix
+az postgres flexible-server show-connection-string --server shared-postgres-ab12 --database postgres --resource-group crud-app --query "connectionStrings.ado.net"
 ```
 
 Take the output and create two connection strings by changing the `Database` value:
 - **Auth Service**: `Database=authdb`
 - **Operational System**: `Database=operationaldb`
 
-Example:
+Example (replace `ab12` with your unique suffix):
 ```
 # Auth Service
-Server=shared-postgres.postgres.database.azure.com;Database=authdb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
+Server=shared-postgres-ab12.postgres.database.azure.com;Database=authdb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
 
 # Operational System
-Server=shared-postgres.postgres.database.azure.com;Database=operationaldb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
+Server=shared-postgres-ab12.postgres.database.azure.com;Database=operationaldb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
 ```
 
 **SQL Server (Delivery):**
 ```bash
-az sql db show-connection-string --server delivery-sqlserver --name deliverydb --client ado.net
+az sql db show-connection-string --server delivery-sqlserver-ab12 --name deliverydb --client ado.net
 ```
 
 > Replace `{your_password}` in each with `MyStr0ngP@ss!`.
@@ -123,8 +131,9 @@ az sql db show-connection-string --server delivery-sqlserver --name deliverydb -
 > **Free tier:** 1 Standard tier registry with 100 GB storage for 12 months.
 
 ```bash
-az acr create --name crudregistry2026 --resource-group crud-app --location southeastasia --sku Standard --admin-enabled true
-az acr credential show --name crudregistry2026 --resource-group crud-app
+# Replace "ab12" with your unique suffix
+az acr create --name crudregistry%UNIQUE% --resource-group crud-app --location southeastasia --sku Standard --admin-enabled true
+az acr credential show --name crudregistry%UNIQUE% --resource-group crud-app
 ```
 
 Save the **username** and **password** for GitHub secrets.
@@ -152,7 +161,7 @@ az containerapp create --name operational-backend --resource-group crud-app --en
 ### 2.9 Deploy Delivery System Backend
 
 ```bash
-az containerapp create --name delivery-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 0 --max-replicas 10 --secrets dbconn="Server=delivery-sqlserver.database.windows.net;Database=deliverydb;User Id=sqladmin;Password=MyStr0ngP@ss!;TrustServerCertificate=True" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__BaseUrl=https://operational-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__ServiceAccountEmployeeNumber=SVC-DELIVERY ExternalSystems__Operational__ServiceAccountPassword=svc-delivery-pwd
+az containerapp create --name delivery-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 0 --max-replicas 10 --secrets dbconn="Server=delivery-sqlserver-%UNIQUE%.database.windows.net;Database=deliverydb;User Id=sqladmin;Password=MyStr0ngP@ss!;TrustServerCertificate=True" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__BaseUrl=https://operational-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__ServiceAccountEmployeeNumber=SVC-DELIVERY ExternalSystems__Operational__ServiceAccountPassword=svc-delivery-pwd
 ```
 
 ### 2.10 Get Backend URLs
