@@ -251,9 +251,15 @@ az containerapp show --name delivery-backend --resource-group crud-app --query "
 3. Click **Add New** → **Project**
 4. Import your repository
 5. **Root Directory**: select `operational-system/operational-frontend`
-6. **Environment Variables**:
-   - `VITE_API_URL`: `https://operational-backend.<hash>.southeastasia.azurecontainerapps.io`
-   - `VITE_AUTH_URL`: `https://auth-backend.<hash>.southeastasia.azurecontainerapps.io`
+6. **Environment Variables** (use the full URLs from step 2.10):
+
+   | Variable | Value |
+   |---|---|
+   | `VITE_API_URL` | `https://operational-backend.abc123.southeastasia.azurecontainerapps.io` |
+   | `VITE_AUTH_URL` | `https://auth-backend.abc123.southeastasia.azurecontainerapps.io` |
+
+   > ⚠️ **Must include `https://`** — without it, the frontend will try to call a relative path on Vercel instead of Azure, resulting in a 405 error.
+
 7. Click **Deploy**
 
 ### 3.2 Create Vercel Project for Delivery Frontend
@@ -262,8 +268,14 @@ az containerapp show --name delivery-backend --resource-group crud-app --query "
 2. Import your repository
 3. **Root Directory**: select `delivery-system/delivery-frontend`
 4. **Environment Variables**:
-   - `VITE_API_URL`: `https://delivery-backend.<hash>.southeastasia.azurecontainerapps.io`
-   - `VITE_AUTH_URL`: `https://auth-backend.<hash>.southeastasia.azurecontainerapps.io`
+
+   | Variable | Value |
+   |---|---|
+   | `VITE_API_URL` | `https://delivery-backend.abc123.southeastasia.azurecontainerapps.io` |
+   | `VITE_AUTH_URL` | `https://auth-backend.abc123.southeastasia.azurecontainerapps.io` |
+
+   > ⚠️ **Must include `https://`**
+
 5. Click **Deploy**
 
 ### 3.3 Get Vercel Tokens and IDs
@@ -458,10 +470,15 @@ Common causes:
 - JWT Key too short (must be 32+ characters)
 - Database firewall not accepting Azure connections
 
-### Frontend shows blank page
-1. Open DevTools (F12) → Console
-2. Check that `VITE_API_URL` and `VITE_AUTH_URL` env vars are set in Vercel
-3. Ensure CORS is configured on the backend (the `Program.cs` already includes it)
+### Frontend shows blank page or returns 405 errors
+1. Open DevTools (F12) → Console → Network tab
+2. Look at the failing request URL. If it starts with your Vercel domain instead of the Azure domain, the `VITE_AUTH_URL` or `VITE_API_URL` is missing the `https://` prefix.
+3. **Fix:** In Vercel → project → **Settings** → **Environment Variables**, ensure values include `https://`:
+   ```
+   ✅ VITE_AUTH_URL=https://auth-backend.abc123.southeastasia.azurecontainerapps.io
+   ❌ VITE_AUTH_URL=auth-backend.abc123.southeastasia.azurecontainerapps.io (missing https://)
+   ```
+4. After fixing, redeploy the frontend from Vercel dashboard (or push a commit).
 
 ### Cross-system integration fails
 1. Verify service account credentials match those seeded in Auth Service
