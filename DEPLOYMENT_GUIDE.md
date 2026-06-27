@@ -233,7 +233,7 @@ az containerapp show --name delivery-backend --resource-group crud-app --query "
 
 1. Go to https://vercel.com → **Add New** → **Project**
 2. Import your repository
-3. **Root Directory**: leave **empty** (blank). The GitHub Action handles the subdirectory via `defaults: run: working-directory`.
+3. **Root Directory**: select `operational-system/operational-frontend`
 4. **Environment Variables** (from step 2.10 URLs — include `https://`):
 
    | Variable | Value |
@@ -247,14 +247,17 @@ az containerapp show --name delivery-backend --resource-group crud-app --query "
 
 ### 3.2 Create Vercel Project for Delivery Frontend
 
-Same steps, but:
-- Repository subdirectory handled by workflow
-- **Environment Variables**:
+1. Click **Add New** → **Project**
+2. Import your repository
+3. **Root Directory**: select `delivery-system/delivery-frontend`
+4. **Environment Variables**:
 
   | Variable | Value |
   |---|---|
   | `VITE_API_URL` | `https://delivery-backend.abc123.southeastasia.azurecontainerapps.io` |
   | `VITE_AUTH_URL` | `https://auth-backend.abc123.southeastasia.azurecontainerapps.io` |
+
+5. Click **Deploy**
 
 ### 3.3 Get Vercel Tokens and IDs
 
