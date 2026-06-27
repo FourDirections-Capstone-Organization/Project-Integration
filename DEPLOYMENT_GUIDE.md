@@ -107,17 +107,17 @@ az sql server firewall-rule create --resource-group crud-app --server delivery-s
 az postgres flexible-server show-connection-string --server shared-postgres-<suffix> --database authdb
 ```
 
-Take the output and create two connection strings by changing the `Database` value:
+Take the output and change `Database=postgres` to the correct value:
 - **Auth Service**: `Database=authdb`
 - **Operational System**: `Database=operationaldb`
 
-Example (replace `<suffix>` with yours):
-```
-# Auth Service
-Server=shared-postgres-<suffix>.postgres.database.azure.com;Database=authdb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
+> ⚠️ The strings below are **reference only** — copy the values, do NOT paste them into PowerShell as commands.
 
-# Operational System
-Server=shared-postgres-<suffix>.postgres.database.azure.com;Database=operationaldb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
+Example connection strings (replace `<suffix>` with yours):
+
+```
+Auth Service:   Server=shared-postgres-<suffix>.postgres.database.azure.com;Database=authdb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
+Operational:    Server=shared-postgres-<suffix>.postgres.database.azure.com;Database=operationaldb;Port=5432;User Id=postgres;Password=MyStr0ngP@ss!;Ssl Mode=Require;Trust Server Certificate=true
 ```
 
 **SQL Server (Delivery):**
