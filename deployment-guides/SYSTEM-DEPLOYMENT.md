@@ -1092,7 +1092,267 @@ Delivery needs products for dropdown
   → Operational checks: role is "Delivery.ExternalService" → ✅ Allowed
 ```
 
-### 7.6 Security Best Practices
+### 7.6 How to Add a New System (e.g., Adding Finance System to an Existing Setup)
+
+This walks through adding a **new Finance System** that needs to read Products from an already-deployed Operational System.
+
+#### The Scenario
+
+You're the **Finance team**. Your boss says: *"Finance needs to see product data from Operational so we can generate invoices. Make it happen."*
+
+Operational is already deployed. They have an `IntegrationController` that currently allows `Delivery.ExternalService` and `SystemAdmin`. You need to:
+
+1. Get Operational to add `Finance.ExternalService` to their allowed roles
+2. Get Operational to create a service account for you (`SVC-FINANCE`)
+3. Create a `OperationalSystemClient` in your Finance backend
+
+---
+
+#### Step 1: Finance Team Asks Operational Team for Access
+
+Send this message to the Operational team:
+
+> *"Hi Operational team, Finance needs to read your products for invoicing. Can you:*
+> 1. *Add `Finance.ExternalService` to your IntegrationController's allowed roles*
+> 2. *Create a service account `SVC-FINANCE` with role `Finance.ExternalService` in the Auth Service*
+> 3. *Share the service account password with us securely*
+
+#### Step 2: Operational Team Updates Their Code
+
+Operational updates their `IntegrationController` to allow Finance:
+
+```csharp
+// Before: only Delivery could call
+[Authorize(Roles = "Delivery.ExternalService,SystemAdmin")]
+
+// After: Finance can now call too
+[Authorize(Roles = "Delivery.ExternalService,Finance.ExternalService,SystemAdmin")]
+```
+
+They push this change to deploy the updated backend.
+
+#### Step 3: Operational Creates a Service Account for Finance
+
+```bash
+# Login as admin
+TOKEN=$(curl -s -X POST https://auth-backend.abc123.southeastasia.azurecontainerapps.io/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"employeeNumber":"admin","password":"admin123"}' | jq -r '.accessToken')
+
+# Create service account for Finance
+curl -X POST https://auth-backend.abc123.southeastasia.azurecontainerapps.io/api/admin/accounts \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "employeeNumber": "SVC-FINANCE",
+    "name": "Finance System Service Account",
+    "email": "svc-finance@system.com",
+    "password": "finance-secure-pwd-abc123",
+    "role": "Finance.ExternalService"
+  }'
+```
+
+Operational sends the password `finance-secure-pwd-abc123` back to the Finance team securely.
+
+---
+
+#### Step 4: Finance Team Creates Their SystemClient
+
+In the Finance backend, they create an `OperationalSystemClient`:
+
+```csharp
+// FinanceSystem.Api/Services/OperationalSystemClient.cs
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+
+namespace FinanceSystem.Api.Services;
+
+public class OperationalSystemClient
+{
+    private readonly HttpClient _httpClient;
+    private string? _cachedToken;
+    private DateTime _tokenExpiresAt;
+    private readonly IConfiguration _config;
+
+    public OperationalSystemClient(HttpClient httpClient, IConfiguration config)
+    {
+        _httpClient = httpClient;
+        _config = config;
+    }
+
+    private async Task<string> GetTokenAsync()
+    {
+        if (_cachedToken != null && DateTime.UtcNow < _tokenExpiresAt)
+            return _cachedToken;
+
+        var authUrl = _config["AuthService:BaseUrl"];
+        var loginPayload = new
+        {
+            employeeNumber = _config["ExternalSystems:Operational:ServiceAccountEmployeeNumber"],
+            password = _config["ExternalSystems:Operational:ServiceAccountPassword"]
+        };
+
+        var response = await _httpClient.PostAsync(
+            $"{authUrl}/api/auth/login",
+            new StringContent(JsonSerializer.Serialize(loginPayload), Encoding.UTF8, "application/json"));
+
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<AccessTokenResult>(json,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        _cachedToken = result!.AccessToken;
+        _tokenExpiresAt = DateTime.UtcNow.AddMinutes(55);
+        return _cachedToken;
+    }
+
+    public async Task<List<ProductDto>> GetProductsAsync()
+    {
+        var token = await GetTokenAsync();
+
+        var request = new HttpRequestMessage(HttpMethod.Get,
+            $"{_config["ExternalSystems:Operational:BaseUrl"]}/api/integration/products");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<List<ProductDto>>(json,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+    }
+
+    private class AccessTokenResult
+    {
+        public string AccessToken { get; set; } = "";
+    }
+}
+```
+
+#### Step 5: Finance Configures Their Settings
+
+In Finance's `appsettings.json`:
+
+```json
+{
+  "AuthService": {
+    "BaseUrl": "https://auth-backend.abc123.southeastasia.azurecontainerapps.io"
+  },
+  "ExternalSystems": {
+    "Operational": {
+      "BaseUrl": "https://operational-backend.abc123.southeastasia.azurecontainerapps.io",
+      "ServiceAccountEmployeeNumber": "SVC-FINANCE",
+      "ServiceAccountPassword": "finance-secure-pwd-abc123"
+    }
+  },
+  "Jwt": {
+    "Key": "ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes!",
+    "Issuer": "CentralAuth",
+    "Audience": "InternalSystems"
+  }
+}
+```
+
+#### Step 6: Finance Registers the Client
+
+In Finance's `Program.cs`:
+
+```csharp
+builder.Services.AddHttpClient<OperationalSystemClient>();
+```
+
+#### Step 7: Finance Uses It in a Controller
+
+```csharp
+[ApiController]
+[Route("api/invoices")]
+[Authorize]
+public class InvoicesController : ControllerBase
+{
+    private readonly OperationalSystemClient _operationalClient;
+
+    public InvoicesController(OperationalSystemClient operationalClient)
+    {
+        _operationalClient = operationalClient;
+    }
+
+    [HttpGet("products")]
+    public async Task<IActionResult> GetProductsForInvoicing()
+    {
+        var products = await _operationalClient.GetProductsAsync();
+        return Ok(products);
+    }
+}
+```
+
+---
+
+#### The Complete Flow (End-to-End)
+
+```
+Finance user clicks "Generate Invoice"
+        │
+Finance Backend calls OperationalSystemClient.GetProductsAsync()
+        │
+        ▼
+SystemClient checks: do we have a cached JWT? → No
+        │
+        ▼
+SystemClient logs in to Auth Service as "SVC-FINANCE":
+  POST https://auth-backend.../api/auth/login
+  { employeeNumber: "SVC-FINANCE", password: "finance-secure-pwd-abc123" }
+        │
+        ▼
+Auth Service returns JWT with role "Finance.ExternalService"
+        │
+        ▼
+SystemClient calls Operational's integration endpoint:
+  GET https://operational-backend.../api/integration/products
+  Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+        │
+        ▼
+Operational's IntegrationController checks the JWT:
+  Role is "Finance.ExternalService"  →  Is it in the allowed list?
+  ["Delivery.ExternalService", "Finance.ExternalService", "SystemAdmin"]
+                                            ↑ YES → ✅ Allowed
+        │
+        ▼
+Operational queries its database → returns product list
+        │
+        ▼
+Product list flows back through SystemClient → Finance Controller → Finance Frontend
+```
+
+#### Key Takeaways for Adding Any New System
+
+| Step | Who does it | What they do |
+|---|---|---|
+| 1 | **New system team** | Asks existing system for access + service account |
+| 2 | **Existing system team** | Adds new role to their `IntegrationController`'s `[Authorize(Roles = "...")]` |
+| 3 | **Existing system team** | Creates `SVC-NEWSYSTEM` service account in Auth Service, shares password |
+| 4 | **New system team** | Creates a SystemClient (named after the target system, e.g. `OperationalSystemClient`) |
+| 5 | **New system team** | Adds configuration: target URL, service account credentials, shared JWT settings |
+| 6 | **New system team** | Registers SystemClient in `Program.cs` and uses it in a controller |
+
+#### The Naming Pattern
+
+```
+SystemClient  = named after the TARGET  (what you're calling)
+ServiceAccount = named after the SOURCE  (who's calling, prefixed with "SVC-")
+Role in JWT  = "<SourceSystem>.ExternalService"
+Allowed by target = checks for "<SourceSystem>.ExternalService" in their [`Authorize`] list
+```
+
+| If... | They create... | Login as | Role in JWT | Target checks for |
+|---|---|---|---|---|
+| Finance calls Operational | `OperationalSystemClient` | `SVC-FINANCE` | `Finance.ExternalService` | `Finance.ExternalService` |
+| Finance calls Delivery | `DeliverySystemClient` | `SVC-FINANCE` | `Finance.ExternalService` | `Finance.ExternalService` |
+| Delivery calls Operational | `OperationalSystemClient` | `SVC-DELIVERY` | `Delivery.ExternalService` | `Delivery.ExternalService` |
+
+Same service account (`SVC-FINANCE`) works for calling ANY system — the role `Finance.ExternalService` is consistent. But each target needs a separate SystemClient because each target has different endpoints and response shapes.
+
+### 7.7 Security Best Practices
 
 1. **Never hardcode** `Jwt:Key` or service account passwords in source code. Use Azure Container App secrets or GitHub Secrets.
 2. **Store secrets** with:
