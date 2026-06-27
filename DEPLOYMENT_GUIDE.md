@@ -27,6 +27,21 @@
 
 > **💰 All services below are covered under the [Azure Free Account](https://azure.microsoft.com/free)** — either as 12-month free services or always-free. See [Cost Summary](#cost-summary).
 
+---
+
+## 🚨 Read This First — Common Pitfalls
+
+| # | Pitfall | Fix |
+|---|---|---|
+| 1 | `Specified server name is already used` | Azure names are globally unique. Change your `<suffix>` and try again. |
+| 2 | `The system cannot find the file specified` | Windows CLI has a length limit. Commands are pre-split into short calls — don't rejoin them. |
+| 3 | `vite: command not found` in Vercel | Set **Root Directory** in Vercel → project → Settings → General to the frontend subdirectory. |
+| 4 | Frontend calls Vercel instead of Azure | `VITE_API_URL` / `VITE_AUTH_URL` must include `https://`. |
+| 5 | `CORS Missing Allow Origin` (404 on OPTIONS) | Container App is still using the sample image. Wait for CI/CD to deploy the custom code. |
+| 6 | CI/CD fails with `ACR not found` | The `AZURE_REGISTRY_NAME` GitHub secret doesn't match your registry name. |
+| 7 | `Resource provider not registered` | First-time subscriptions need `az provider register` for PostgreSQL, SQL, Container Apps, and ACR. |
+| 8 | Auth Service connection string shows `{login}` / `{password}` | Extract the `"ado.net"` value from JSON and replace with `postgres` / `MyStr0ngP@ss!`. |
+
 ## Prerequisites
 
 ### Accounts
@@ -228,6 +243,8 @@ az containerapp show --name delivery-backend --resource-group crud-app --query "
 ---
 
 ## Phase 3: Set Up Vercel (Frontends)
+
+> **⚠️ Important:** The Root Directory setting below is **critical**. If left blank, Vercel auto-deployments will fail with `vite: command not found` because it runs from the repo root where there's no frontend.
 
 ### 3.1 Create Vercel Project for Operational Frontend
 
@@ -432,38 +449,44 @@ curl https://operational-backend.abc123.southeastasia.azurecontainerapps.io/api/
 ```bash
 az containerapp logs show --name auth-backend --resource-group crud-app --tail 50
 ```
-Common causes:
+**Common causes:**
 - Wrong database connection string in secret
 - JWT Key too short (must be 32+ characters)
 - Database firewall not accepting Azure connections
-- Resource provider not registered (run `az provider register` commands from step 2.1)
+- Resource provider not registered (run `az provider register` from step 2.1)
 
 ### CI/CD — ACR login fails ("resource not found")
-The `AZURE_REGISTRY_NAME` GitHub secret doesn't match your actual ACR name. Find it:
+The `AZURE_REGISTRY_NAME` GitHub secret doesn't match your actual ACR name:
 ```bash
 az acr list --resource-group crud-app --query "[].name" --output tsv
 ```
-Then update the secret in GitHub repo settings.
+Set the output as the `AZURE_REGISTRY_NAME` secret (no `.azurecr.io` suffix).
 
-### CI/CD — Vercel "vite: command not found"
-The workflow runs `npm install` before `npx vercel`, but if the build cache is stale, clear it:
-1. Vercel dashboard → project → **Settings** → **Build Cache** → **Clear cache**
-2. Re-run the workflow
+### CI/CD — Vercel auto-deployments fail with "vite: command not found"
+This happens when Vercel's auto-deployment runs from the repo root (no frontend there). **Fix:**
+1. Vercel → project → **Settings** → **General** → **Root Directory** → set to the subdirectory (e.g. `operational-system/operational-frontend`)
+2. Push again — auto-deployments will now build from the correct directory
 
-### Frontend shows blank page or 405 errors
+### CI/CD — Vercel "vite: command not found" in GitHub Actions workflow
+The GitHub Actions workflow builds the frontend locally using `npx vercel build`, then deploys via `npx vercel deploy --prebuilt`. This does NOT depend on Vercel's build cache. If it fails:
+1. Check that `npm install` succeeded (vite is installed)
+2. Re-run the workflow from GitHub Actions tab
+
+### Frontend shows blank page, 405 errors, or wrong domain
 1. Open DevTools (F12) → Network tab
-2. If the request URL starts with your **Vercel domain** instead of Azure, the `VITE_API_URL` or `VITE_AUTH_URL` is missing `https://`
-3. Fix in Vercel → project → **Settings** → **Environment Variables**
+2. If the request URL starts with your **Vercel domain** instead of Azure → `VITE_API_URL` or `VITE_AUTH_URL` is missing `https://`
    ```
    ✅ VITE_AUTH_URL=https://auth-backend.abc123.southeastasia.azurecontainerapps.io
    ❌ VITE_AUTH_URL=auth-backend.abc123.southeastasia.azurecontainerapps.io
    ```
+3. Fix in Vercel → project → **Settings** → **Environment Variables**
+4. Redeploy from Vercel dashboard or push a commit
 
-### CORS errors (OPTIONS returns 404)
-Your backend is still running the **sample image** (`mcr.microsoft.com/dotnet/samples:aspnetapp`). The CI/CD pipeline must complete successfully to deploy the custom code with CORS support. Check GitHub Actions → **Deploy Auth Service** → wait for green.
+### CORS errors (OPTIONS returns 404 without CORS headers)
+The backend is still running the **sample Docker image** (`mcr.microsoft.com/dotnet/samples:aspnetapp`). The CI/CD pipeline must successfully build and deploy our custom image (which includes CORS middleware). Wait for GitHub Actions → **Deploy Auth Service** to turn green.
 
 ### CORS security note
-This project uses `AllowAnyOrigin()` in `Program.cs` for demo simplicity. For production, restrict to your Vercel URL:
+This demo uses `AllowAnyOrigin()` — it accepts requests from any domain. **Not secure for production.** Replace in `Program.cs`:
 ```csharp
 options.WithOrigins("https://your-app.vercel.app")
        .AllowAnyHeader()
@@ -471,14 +494,23 @@ options.WithOrigins("https://your-app.vercel.app")
 ```
 
 ### Cross-system integration fails
-1. Verify service account credentials match those seeded in Auth Service
-2. Check the target system's integration endpoint is accessible
-3. Confirm JWT roles (e.g., `Operational.ExternalService` for Delivery → Operational calls)
+1. Verify service account credentials match those seeded in Auth Service (`SVC-OPERATIONAL` / `SVC-DELIVERY`)
+2. Check the target system's integration endpoint is accessible via curl
+3. Confirm JWT role prefixes: `Operational.ExternalService` for Delivery→Operational, `Delivery.ExternalService` for Operational→Delivery
 
 ### GitHub Actions fails
 1. Go to repo → **Actions** → click the failed run
-2. Read the error message
-3. Common issues: secrets not set, Azure credentials expired, Docker build fails
+2. Read the red error message
+3. Common issues:
+   - ACR name mismatch → set `AZURE_REGISTRY_NAME` secret
+   - Azure credentials expired → re-run `az ad sp create-for-rbac`
+   - Vercel project IDs wrong → check Vercel project settings
+
+### Windows CLI "The system cannot find the file specified"
+Commands with too many environment variables hit a Windows command-line length limit. **Fix:** The commands in this guide are already split into individual `az containerapp update --set-env-vars KEY=VALUE` calls. Copy them exactly.
+
+### Azure "Specified server name is already used"
+Server names (PostgreSQL, SQL Server, ACR) must be globally unique. **Fix:** Change your `<suffix>` and recreate.
 
 ---
 
