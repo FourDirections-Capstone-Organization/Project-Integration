@@ -470,14 +470,22 @@ Common causes:
 - JWT Key too short (must be 32+ characters)
 - Database firewall not accepting Azure connections
 
-### Frontend shows blank page or returns 405 errors
+### CORS errors (demo security note)
+This project uses `AllowAnyOrigin()` in `Program.cs` for demo simplicity — it accepts requests from any domain. This is **not secure for production**. For production, replace with the specific Vercel URL:
+```csharp
+options.WithOrigins("https://your-app.vercel.app")
+       .AllowAnyHeader()
+       .AllowAnyMethod();
+```
+
+### Frontend shows blank page, 405 errors, or CORS errors
 1. Open DevTools (F12) → Console → Network tab
-2. Look at the failing request URL. If it starts with your Vercel domain instead of the Azure domain, the `VITE_AUTH_URL` or `VITE_API_URL` is missing the `https://` prefix.
-3. **Fix:** In Vercel → project → **Settings** → **Environment Variables**, ensure values include `https://`:
+2. If the request URL starts with your Vercel domain instead of the Azure domain, the `VITE_AUTH_URL` or `VITE_API_URL` is missing the `https://` prefix:
    ```
    ✅ VITE_AUTH_URL=https://auth-backend.abc123.southeastasia.azurecontainerapps.io
    ❌ VITE_AUTH_URL=auth-backend.abc123.southeastasia.azurecontainerapps.io (missing https://)
    ```
+3. If you see **"CORS Missing Allow Origin"**, the backend is missing CORS headers. The backends already include `AllowAnyOrigin()` in their `Program.cs`, so ensure you've pushed the latest code and redeployed via GitHub Actions.
 4. After fixing, redeploy the frontend from Vercel dashboard (or push a commit).
 
 ### Cross-system integration fails
