@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Order, CreateOrderDto, UpdateOrderDto } from '../types/order';
+import type { Order, CreateOrderDto, UpdateOrderDto, ProductReference } from '../types/order';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002';
 
@@ -49,4 +49,9 @@ export const updateOrder = async (id: string, data: UpdateOrderDto): Promise<Ord
 
 export const deleteOrder = async (id: string): Promise<void> => {
   await api.delete(`/api/orders/${id}`);
+};
+
+export const getProducts = async (): Promise<ProductReference[]> => {
+  const response = await api.get<ProductReference[]>('/api/products');
+  return response.data;
 };

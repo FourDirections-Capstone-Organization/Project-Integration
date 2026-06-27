@@ -32,6 +32,22 @@ public class OperationalSystemClient : IOperationalSystemClient
         return JsonSerializer.Deserialize<Models.DTOs.OperationalProductResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 
+    public async Task<List<Models.DTOs.OperationalProductResponse>> GetAllProductsAsync()
+    {
+        await EnsureTokenAsync();
+
+        var request = new HttpRequestMessage(HttpMethod.Get,
+            $"{_configuration["ExternalSystems:Operational:BaseUrl"]}/api/integration/products");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _tokenStore.Token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode) return new List<Models.DTOs.OperationalProductResponse>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<List<Models.DTOs.OperationalProductResponse>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+               ?? new List<Models.DTOs.OperationalProductResponse>();
+    }
+
     private async Task EnsureTokenAsync()
     {
         if (_tokenStore.IsValid) return;

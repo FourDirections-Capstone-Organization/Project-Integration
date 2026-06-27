@@ -23,3 +23,10 @@ export interface UpdateOrderDto {
   status: string;
   customerName: string;
 }
+
+export interface ProductReference {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { createOrder, updateOrder } from '../api/deliveryApi';
-import type { Order, CreateOrderDto, UpdateOrderDto } from '../types/order';
+import { createOrder, updateOrder, getProducts } from '../api/deliveryApi';
+import type { Order, CreateOrderDto, UpdateOrderDto, ProductReference } from '../types/order';
 
 interface Props {
   order: Order | null;
@@ -9,25 +9,39 @@ interface Props {
 }
 
 export const OrderForm = ({ order, onSaved, onCancel }: Props) => {
-  const [productName, setProductName] = useState(order?.productName || '');
+  const [products, setProducts] = useState<ProductReference[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState(order?.productId || '');
+  const [selectedProductName, setSelectedProductName] = useState(order?.productName || '');
   const [quantity, setQuantity] = useState(order?.quantity?.toString() || '1');
   const [status, setStatus] = useState(order?.status || 'Pending');
   const [customerName, setCustomerName] = useState(order?.customerName || '');
 
   useEffect(() => {
+    getProducts().then(setProducts).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (order) {
-      setProductName(order.productName);
+      setSelectedProductId(order.productId);
+      setSelectedProductName(order.productName);
       setQuantity(order.quantity.toString());
       setStatus(order.status);
       setCustomerName(order.customerName);
     }
   }, [order]);
 
+  const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value;
+    setSelectedProductId(id);
+    const product = products.find((p) => p.id === id);
+    setSelectedProductName(product?.name || '');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const data = {
-      productId: order?.productId || '00000000-0000-0000-0000-000000000000',
-      productName,
+      productId: selectedProductId,
+      productName: selectedProductName,
       quantity: parseInt(quantity),
       status,
       customerName,
@@ -46,8 +60,15 @@ export const OrderForm = ({ order, onSaved, onCancel }: Props) => {
     <form onSubmit={handleSubmit} style={{ marginBottom: 20, padding: 16, border: '1px solid #ccc' }}>
       <h3>{order ? 'Edit Order' : 'New Order'}</h3>
       <div style={{ marginBottom: 8 }}>
-        <label>Product Name:</label><br />
-        <input value={productName} onChange={(e) => setProductName(e.target.value)} required style={{ width: '100%', padding: 6 }} />
+        <label>Product (from Operational System):</label><br />
+        <select value={selectedProductId} onChange={handleProductChange} required style={{ width: '100%', padding: 6 }}>
+          <option value="">-- Select a product --</option>
+          {products.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} (${p.price.toFixed(2)})
+            </option>
+          ))}
+        </select>
       </div>
       <div style={{ marginBottom: 8 }}>
         <label>Quantity:</label><br />
