@@ -104,7 +104,7 @@ az sql server firewall-rule create --resource-group crud-app --server delivery-s
 
 **PostgreSQL (Auth & Operational share the same server, different databases):**
 ```bash
-az postgres flexible-server show-connection-string --name shared-postgres-<suffix> --database authdb
+az postgres flexible-server show-connection-string --server shared-postgres-<suffix> --database authdb
 ```
 
 Take the output and create two connection strings by changing the `Database` value:
