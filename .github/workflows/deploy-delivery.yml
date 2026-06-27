@@ -1,0 +1,56 @@
+name: Deploy Delivery System
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'delivery-system/**'
+      - '.github/workflows/deploy-delivery.yml'
+
+env:
+  AZURE_CONTAINER_REGISTRY: crudregistry2026.azurecr.io
+  BACKEND_IMAGE_NAME: delivery-backend
+  AZURE_CONTAINER_APP_NAME: delivery-backend
+  AZURE_RESOURCE_GROUP: crud-app
+  FRONTEND_PATH: delivery-system/delivery-frontend
+
+jobs:
+  build-and-deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login --name crudregistry2026
+
+      - name: Build and push Delivery Docker image
+        run: |
+          docker build -t ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ github.sha }} ./delivery-system/DeliverySystem.Api
+          docker tag ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ github.sha }} ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:latest
+          docker push --all-tags ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
+
+      - name: Configure ACR credentials on Container App
+        run: |
+          az containerapp registry set --name ${{ env.AZURE_CONTAINER_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --server ${{ env.AZURE_CONTAINER_REGISTRY }} --username ${{ secrets.AZURE_REGISTRY_USERNAME }} --password ${{ secrets.AZURE_REGISTRY_PASSWORD }}
+
+      - name: Deploy to Azure Container Apps
+        run: |
+          az containerapp update --name ${{ env.AZURE_CONTAINER_APP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --image ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:${{ github.sha }}
+
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    needs: build-and-deploy-backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        run: npx vercel@latest --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
+        working-directory: ${{ env.FRONTEND_PATH }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DELIVERY }}
