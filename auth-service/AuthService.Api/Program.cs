@@ -8,6 +8,16 @@ using AuthService.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddControllers();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -44,6 +54,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
