@@ -60,25 +60,25 @@ git push -u origin main
 
 ```bash
 az login
-az group create --name crud-app --location eastus
+az group create --name crud-app --location southeastasia
 ```
 
 ### 2.2 Create PostgreSQL Databases (Auth & Operational)
 
 **Auth Service Database:**
 ```bash
-az postgres flexible-server create --name auth-db --resource-group crud-app --location eastus --admin-user postgres --admin-password MyStr0ngP@ss! --sku-name Standard_B1ms --tier Burstable --storage-size 32 --public-access 0.0.0.0
+az postgres flexible-server create --name auth-db --resource-group crud-app --location southeastasia --admin-user postgres --admin-password MyStr0ngP@ss! --sku-name Standard_B1ms --tier Burstable --storage-size 32 --public-access 0.0.0.0
 ```
 
 **Operational System Database:**
 ```bash
-az postgres flexible-server create --name operational-db --resource-group crud-app --location eastus --admin-user postgres --admin-password MyStr0ngP@ss! --sku-name Standard_B1ms --tier Burstable --storage-size 32 --public-access 0.0.0.0
+az postgres flexible-server create --name operational-db --resource-group crud-app --location southeastasia --admin-user postgres --admin-password MyStr0ngP@ss! --sku-name Standard_B1ms --tier Burstable --storage-size 32 --public-access 0.0.0.0
 ```
 
 ### 2.3 Create SQL Server Database (Delivery)
 
 ```bash
-az sql server create --name delivery-sqlserver --resource-group crud-app --location eastus --admin-user sqladmin --admin-password MyStr0ngP@ss!
+az sql server create --name delivery-sqlserver --resource-group crud-app --location southeastasia --admin-user sqladmin --admin-password MyStr0ngP@ss!
 az sql db create --resource-group crud-app --server delivery-sqlserver --name deliverydb --service-objective S0
 az sql server firewall-rule create --resource-group crud-app --server delivery-sqlserver --name AllowAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
 ```
@@ -101,7 +101,7 @@ az sql db show-connection-string --server delivery-sqlserver --name deliverydb -
 ### 2.5 Create Azure Container Registry
 
 ```bash
-az acr create --name crudregistry2026 --resource-group crud-app --location eastus --sku Basic --admin-enabled true
+az acr create --name crudregistry2026 --resource-group crud-app --location southeastasia --sku Basic --admin-enabled true
 az acr credential show --name crudregistry2026 --resource-group crud-app
 ```
 
@@ -110,7 +110,7 @@ Save the **username** and **password** for GitHub secrets.
 ### 2.6 Create Container Apps Environment
 
 ```bash
-az containerapp env create --name crud-env --resource-group crud-app --location eastus
+az containerapp env create --name crud-env --resource-group crud-app --location southeastasia
 ```
 
 ### 2.7 Deploy Auth Service Backend
@@ -122,13 +122,13 @@ az containerapp create --name auth-backend --resource-group crud-app --environme
 ### 2.8 Deploy Operational System Backend
 
 ```bash
-az containerapp create --name operational-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 1 --max-replicas 10 --secrets dbconn="<operational-postgres-connection-string>" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.eastus.azurecontainerapps.io ExternalSystems__Delivery__BaseUrl=https://delivery-backend.<your-env-hash>.eastus.azurecontainerapps.io ExternalSystems__Delivery__ServiceAccountEmployeeNumber=SVC-OPERATIONAL ExternalSystems__Delivery__ServiceAccountPassword=svc-operational-pwd
+az containerapp create --name operational-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 1 --max-replicas 10 --secrets dbconn="<operational-postgres-connection-string>" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Delivery__BaseUrl=https://delivery-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Delivery__ServiceAccountEmployeeNumber=SVC-OPERATIONAL ExternalSystems__Delivery__ServiceAccountPassword=svc-operational-pwd
 ```
 
 ### 2.9 Deploy Delivery System Backend
 
 ```bash
-az containerapp create --name delivery-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 1 --max-replicas 10 --secrets dbconn="Server=delivery-sqlserver.database.windows.net;Database=deliverydb;User Id=sqladmin;Password=MyStr0ngP@ss!;TrustServerCertificate=True" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.eastus.azurecontainerapps.io ExternalSystems__Operational__BaseUrl=https://operational-backend.<your-env-hash>.eastus.azurecontainerapps.io ExternalSystems__Operational__ServiceAccountEmployeeNumber=SVC-DELIVERY ExternalSystems__Operational__ServiceAccountPassword=svc-delivery-pwd
+az containerapp create --name delivery-backend --resource-group crud-app --environment crud-env --image mcr.microsoft.com/dotnet/samples:aspnetapp --target-port 8080 --ingress external --min-replicas 1 --max-replicas 10 --secrets dbconn="Server=delivery-sqlserver.database.windows.net;Database=deliverydb;User Id=sqladmin;Password=MyStr0ngP@ss!;TrustServerCertificate=True" --env-vars ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://0.0.0.0:8080 ConnectionStrings__DefaultConnection=secretref:dbconn Jwt__Key=ThisIsASuperSecretKeyForJwtThatIsAtLeast32Bytes! Jwt__Issuer=CentralAuth Jwt__Audience=InternalSystems AuthService__BaseUrl=https://auth-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__BaseUrl=https://operational-backend.<your-env-hash>.southeastasia.azurecontainerapps.io ExternalSystems__Operational__ServiceAccountEmployeeNumber=SVC-DELIVERY ExternalSystems__Operational__ServiceAccountPassword=svc-delivery-pwd
 ```
 
 ### 2.10 Get Backend URLs
@@ -151,8 +151,8 @@ az containerapp show --name delivery-backend --resource-group crud-app --query "
 4. Import your repository
 5. **Root Directory**: select `operational-system/operational-frontend`
 6. **Environment Variables**:
-   - `VITE_API_URL`: `https://operational-backend.<hash>.eastus.azurecontainerapps.io`
-   - `VITE_AUTH_URL`: `https://auth-backend.<hash>.eastus.azurecontainerapps.io`
+   - `VITE_API_URL`: `https://operational-backend.<hash>.southeastasia.azurecontainerapps.io`
+   - `VITE_AUTH_URL`: `https://auth-backend.<hash>.southeastasia.azurecontainerapps.io`
 7. Click **Deploy**
 
 ### 3.2 Create Vercel Project for Delivery Frontend
@@ -161,8 +161,8 @@ az containerapp show --name delivery-backend --resource-group crud-app --query "
 2. Import your repository
 3. **Root Directory**: select `delivery-system/delivery-frontend`
 4. **Environment Variables**:
-   - `VITE_API_URL`: `https://delivery-backend.<hash>.eastus.azurecontainerapps.io`
-   - `VITE_AUTH_URL`: `https://auth-backend.<hash>.eastus.azurecontainerapps.io`
+   - `VITE_API_URL`: `https://delivery-backend.<hash>.southeastasia.azurecontainerapps.io`
+   - `VITE_AUTH_URL`: `https://auth-backend.<hash>.southeastasia.azurecontainerapps.io`
 5. Click **Deploy**
 
 ### 3.3 Get Vercel Tokens and IDs
@@ -223,7 +223,7 @@ Go to GitHub → **Actions** tab to watch the three workflows:
 
 ```bash
 # Login as admin
-curl -X POST https://auth-backend.<hash>.eastus.azurecontainerapps.io/api/auth/login \
+curl -X POST https://auth-backend.<hash>.southeastasia.azurecontainerapps.io/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"employeeNumber":"admin","password":"admin123"}'
 ```
@@ -242,13 +242,13 @@ Expected response:
 
 ```bash
 # Create a product (use the token from login)
-curl -X POST https://operational-backend.<hash>.eastus.azurecontainerapps.io/api/products \
+curl -X POST https://operational-backend.<hash>.southeastasia.azurecontainerapps.io/api/products \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <token>" \
   -d '{"name":"Widget","description":"A useful widget","price":19.99}'
 
 # Get all products
-curl https://operational-backend.<hash>.eastus.azurecontainerapps.io/api/products \
+curl https://operational-backend.<hash>.southeastasia.azurecontainerapps.io/api/products \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -256,13 +256,13 @@ curl https://operational-backend.<hash>.eastus.azurecontainerapps.io/api/product
 
 ```bash
 # Create an order
-curl -X POST https://delivery-backend.<hash>.eastus.azurecontainerapps.io/api/orders \
+curl -X POST https://delivery-backend.<hash>.southeastasia.azurecontainerapps.io/api/orders \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <token>" \
   -d '{"productId":"<product-id-from-operational>","productName":"Widget","quantity":5,"status":"Pending","customerName":"John Doe"}'
 
 # Get all orders
-curl https://delivery-backend.<hash>.eastus.azurecontainerapps.io/api/orders \
+curl https://delivery-backend.<hash>.southeastasia.azurecontainerapps.io/api/orders \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -272,20 +272,20 @@ Login with a service account to test integration endpoints:
 
 ```bash
 # Login as SVC-DELIVERY
-TOKEN=$(curl -s -X POST https://auth-backend.<hash>.eastus.azurecontainerapps.io/api/auth/login \
+TOKEN=$(curl -s -X POST https://auth-backend.<hash>.southeastasia.azurecontainerapps.io/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"employeeNumber":"SVC-DELIVERY","password":"svc-delivery-pwd"}' | jq -r '.accessToken')
 
 # Call Operational integration endpoint
-curl https://operational-backend.<hash>.eastus.azurecontainerapps.io/api/integration/products \
+curl https://operational-backend.<hash>.southeastasia.azurecontainerapps.io/api/integration/products \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 ### 6.5 View API Documentation
 
-- **Auth Service (Scalar)**: `https://auth-backend.<hash>.eastus.azurecontainerapps.io/scalar/v1`
-- **Operational System (Scalar)**: `https://operational-backend.<hash>.eastus.azurecontainerapps.io/scalar/v1`
-- **Delivery System (Swagger)**: `https://delivery-backend.<hash>.eastus.azurecontainerapps.io/swagger`
+- **Auth Service (Scalar)**: `https://auth-backend.<hash>.southeastasia.azurecontainerapps.io/scalar/v1`
+- **Operational System (Scalar)**: `https://operational-backend.<hash>.southeastasia.azurecontainerapps.io/scalar/v1`
+- **Delivery System (Swagger)**: `https://delivery-backend.<hash>.southeastasia.azurecontainerapps.io/swagger`
 
 ### 6.6 Test via Frontend
 

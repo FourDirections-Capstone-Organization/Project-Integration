@@ -100,16 +100,16 @@ This opens a browser. Log in with the same Microsoft account you used for Azure.
 A resource group is like a folder that holds all your Azure services together.
 
 ```bash
-az group create --name crud-app --location eastus
+az group create --name crud-app --location southeastasia
 ```
 
 - `--name crud-app` — you can name it anything
-- `--location eastus` — choose a region close to you (eastus, westus, southeastasia, etc.)
+- `--location southeastasia` — choose a region close to you (southeastasia, westus, southeastasia, etc.)
 
 ### 2.4 Create the PostgreSQL Database
 
 ```bash
-az postgres flexible-server create --name crud-db --resource-group crud-app --location eastus --admin-user postgres --admin-password MyStr0ngP@ss! --sku-name Standard_B1ms --tier Burstable --storage-size 32 --public-access 0.0.0.0
+az postgres flexible-server create --name crud-db --resource-group crud-app --location southeastasia --admin-user postgres --admin-password MyStr0ngP@ss! --sku-name Standard_B1ms --tier Burstable --storage-size 32 --public-access 0.0.0.0
 ```
 
 **What each flag does:**
@@ -148,7 +148,7 @@ Server=crud-db.postgres.database.azure.com;Database=postgres;Port=5432;User Id=p
 Azure Container Registry (ACR) is a place to store Docker images (like a private Docker Hub).
 
 ```bash
-az acr create --name crudregistry2026 --resource-group crud-app --location eastus --sku Basic --admin-enabled true
+az acr create --name crudregistry2026 --resource-group crud-app --location southeastasia --sku Basic --admin-enabled true
 ```
 
 > **Note**: `crudregistry2026` must be globally unique. If it's taken, try `crudappregistry123`, `mycrudregistry`, etc. The name can contain letters and numbers only.
@@ -166,7 +166,7 @@ Save the **username** and one of the **passwords** shown.
 Azure Container Apps runs your Docker containers without managing servers (serverless).
 
 ```bash
-az containerapp env create --name crud-env --resource-group crud-app --location eastus
+az containerapp env create --name crud-env --resource-group crud-app --location southeastasia
 ```
 
 ### 2.8 Deploy the Backend to Azure Container Apps
@@ -193,9 +193,9 @@ az containerapp create --name crud-backend --resource-group crud-app --environme
 az containerapp show --name crud-backend --resource-group crud-app --query "properties.configuration.ingress.fqdn" --output tsv
 ```
 
-This outputs something like: `crud-backend.cleverhill-abc123.eastus.azurecontainerapps.io`
+This outputs something like: `crud-backend.cleverhill-abc123.southeastasia.azurecontainerapps.io`
 
-Your backend API lives at: `https://crud-backend.cleverhill-abc123.eastus.azurecontainerapps.io`
+Your backend API lives at: `https://crud-backend.cleverhill-abc123.southeastasia.azurecontainerapps.io`
 
 > **Testing**: Open this URL in a browser. You should see `404` (that's fine — it means the API is running but `/` has no route). Try `https://your-url/swagger` to see the API docs.
 
@@ -324,7 +324,7 @@ Vercel is a hosting platform for frontend apps. It gives you a global CDN, autom
    - **Root Directory**: Click **Edit** → select `Frontend`
    - **Environment Variables**: Add one:
      - Name: `VITE_API_URL`
-     - Value: `https://crud-backend.cleverhill-abc123.eastus.azurecontainerapps.io/api` (replace with YOUR backend URL from step 2.9)
+     - Value: `https://crud-backend.cleverhill-abc123.southeastasia.azurecontainerapps.io/api` (replace with YOUR backend URL from step 2.9)
 8. Click **Deploy**
 
 Vercel gives you a URL like: `https://crud-app.vercel.app`
@@ -444,7 +444,7 @@ To have `https://api.yourapp.com` point to your backend:
 1. Cloudflare → DNS → Add record:
    - Type: `CNAME`
    - Name: `api`
-   - Content: `crud-backend.cleverhill-abc123.eastus.azurecontainerapps.io`
+   - Content: `crud-backend.cleverhill-abc123.southeastasia.azurecontainerapps.io`
    - Proxy: **DNS only** (gray cloud) — Azure manages its own SSL
 2. In Azure Portal:
    - Search for **crud-backend** → **Settings** → **Custom domains**
@@ -464,7 +464,7 @@ Application Insights gives you dashboards showing:
 ### 7.1 Create the Resource
 
 ```bash
-az monitor app-insights component create --app crud-insights --resource-group crud-app --location eastus --application-type web
+az monitor app-insights component create --app crud-insights --resource-group crud-app --location southeastasia --application-type web
 ```
 
 ### 7.2 Get the Connection String
