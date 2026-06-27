@@ -244,7 +244,7 @@ az containerapp show --name delivery-backend --resource-group crud-app --query "
 
 ## Phase 3: Set Up Vercel (Frontends)
 
-> **⚠️ Important:** The Root Directory setting below is **critical**. If left blank, Vercel auto-deployments will fail with `vite: command not found` because it runs from the repo root where there's no frontend.
+> **⚠️ Critical:** The **Root Directory** must be set in each Vercel project's settings. Without it, both auto-deployments and CLI deploys will fail (`vite: command not found` or path errors).
 
 ### 3.1 Create Vercel Project for Operational Frontend
 
@@ -275,6 +275,8 @@ az containerapp show --name delivery-backend --resource-group crud-app --query "
   | `VITE_AUTH_URL` | `https://auth-backend.abc123.southeastasia.azurecontainerapps.io` |
 
 5. Click **Deploy**
+
+> ✅ **After setting Root Directory:** Both Vercel auto-deployments (triggered by Git push) and GitHub Actions CLI deploys (`npx vercel --prod`) will work without path issues. The Root Directory tells Vercel where the frontend code lives, so it can find `package.json`, `vite.config.ts`, and `index.html`.
 
 ### 3.3 Get Vercel Tokens and IDs
 
@@ -462,15 +464,14 @@ az acr list --resource-group crud-app --query "[].name" --output tsv
 ```
 Set the output as the `AZURE_REGISTRY_NAME` secret (no `.azurecr.io` suffix).
 
-### CI/CD — Vercel auto-deployments fail with "vite: command not found"
-This happens when Vercel's auto-deployment runs from the repo root (no frontend there). **Fix:**
-1. Vercel → project → **Settings** → **General** → **Root Directory** → set to the subdirectory (e.g. `operational-system/operational-frontend`)
-2. Push again — auto-deployments will now build from the correct directory
+### CI/CD — Vercel fails with "vite: command not found" or path errors
+Both issues have the same fix — the **Root Directory** in Vercel project settings is missing or wrong:
 
-### CI/CD — Vercel "vite: command not found" in GitHub Actions workflow
-The GitHub Actions workflow builds the frontend locally using `npx vercel build`, then deploys via `npx vercel deploy --prebuilt`. This does NOT depend on Vercel's build cache. If it fails:
-1. Check that `npm install` succeeded (vite is installed)
-2. Re-run the workflow from GitHub Actions tab
+1. Vercel → project → **Settings** → **General** → **Root Directory**
+2. Set it to the frontend subdirectory: `operational-system/operational-frontend` or `delivery-system/delivery-frontend`
+3. Push again — both auto-deployments and GitHub Actions CLI deploys will work
+
+The Root Directory tells Vercel where `package.json` and `index.html` live. Without it, Vercel tries to build from the repo root and can't find vite or the entry point.
 
 ### Frontend shows blank page, 405 errors, or wrong domain
 1. Open DevTools (F12) → Network tab
