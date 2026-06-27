@@ -27,7 +27,7 @@ export const LoginPage = () => {
 
   return (
     <div style={{ maxWidth: 400, margin: '100px auto', padding: 20 }}>
-      <h1 style={{ marginBottom: 24 }}>Operational System</h1>
+      <h1 style={{ marginBottom: 24, wordSpacing: 8 }}>Operational System</h1>
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: 12 }}>
           <label>Employee Number:</label><br />
