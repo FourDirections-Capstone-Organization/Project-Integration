@@ -250,7 +250,7 @@ az containerapp show --name delivery-backend --resource-group crud-app --query "
 2. Sign up with GitHub
 3. Click **Add New** → **Project**
 4. Import your repository
-5. **Root Directory**: leave as `/` (root of the repo). The GitHub Actions workflow uses `--cwd` to point to the correct subdirectory.
+5. **Root Directory**: leave **empty** (blank). The GitHub Actions workflow uses `--cwd` to point to the correct subdirectory.
 6. **Environment Variables** (use the full URLs from step 2.10):
 
    | Variable | Value |
@@ -262,13 +262,13 @@ az containerapp show --name delivery-backend --resource-group crud-app --query "
 
 7. Click **Deploy**
 
-> ⚠️ **Already created the project with a subdirectory root?** Go to Vercel → project → **Settings** → **General** → **Root Directory** and change it to `/`. The `--cwd` flag in the GitHub Action handles the subdirectory path automatically.
+> ⚠️ **Already created the project with a subdirectory root?** Go to Vercel → project → **Settings** → **General** → **Root Directory** and clear the field (set it to blank). The `--cwd` flag in the GitHub Action handles the subdirectory path automatically.
 
 ### 3.2 Create Vercel Project for Delivery Frontend
 
 1. Click **Add New** → **Project**
 2. Import your repository
-3. **Root Directory**: leave as `/` (root of the repo).
+3. **Root Directory**: leave **empty** (blank).
 4. **Environment Variables**:
 
    | Variable | Value |
